@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro with Local Music</title>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background-size: contain;
+            background-position: center;
+            color: white;
+            font-family: 'Raleway', sans-serif;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #timer {
+            font-size: 5rem;
+            font-family: 'Roboto Mono', monospace;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        #session-type {
+            font-size: 2rem;
+            font-family: 'Raleway', sans-serif;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 5px 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        #controls, #settings, #songs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #controls button, #settings button, #songs button {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffb3b3 100%);
+            color: black;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: background 0.3s, transform 0.3s;
+        }
+        #controls button:hover, #settings button:hover, #songs button:hover {
+            background: linear-gradient(135deg, #ffb3b3 0%, #ff6b6b 100%);
+            transform: translateY(-2px);
+        }
+        #settings {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-start;
+            position: absolute;
+            left: 20px;
+            top: 120px;
+        }
+        #settings label {
+            display: flex;
+            align-items: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: black;
+        }
+        #settings button {
+            margin: 0 5px;
+        }
+        #songs {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            align-items: center;
+        }
+        #songs::before {
+            content: 'Play Music';
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        audio {
+            margin-top: 10px;
+            width: 300px;
+        }
+        #progress-bar {
+            width: 100%;
+            height: 10px;
+            background: #ccc;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        #progress-bar-filled {
+            width: 0%;
+            height: 100%;
+            background: #ff6b6b;
+        }
+        body {
+            background-image: url('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDV4Zmxlbjhwb2dsMmlma2FxY3pheXNuZHMxaG5yaHo1aXg2YTJuaSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/og7NGYFkgdHSc9vO9J/giphy.gif');
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="session-type">Focus Time</div>
+        <div id="timer">25:00</div>
+        <div id="controls">
+            <button onclick="startPomodoro()">Start Focus</button>
+            <button onclick="startBreak()">Start Break</button>
+            <button onclick="resetPomodoro()">Reset</button>
+        </div>
+        <div id="settings">
+            <label>Focus Time:
+                <button onclick="adjustFocusTime(-5)">-</button>
+                <span id="focus-time">25</span> min
+                <button onclick="adjustFocusTime(5)">+</button>
+            </label>
+            <label>Break Time:
+                <button onclick="adjustBreakTime(-1)">-</button>
+                <span id="break-time">5</span> min
+                <button onclick="adjustBreakTime(1)">+</button>
+            </label>
+            <label>Sessions:
+                <button onclick="adjustSessions(-1)">-</button>
+                <span id="sessions-count">4</span>
+                <button onclick="adjustSessions(1)">+</button>
+            </label>
+        </div>
+        <div id="songs">
+            <button id="calm-button" onclick="playSong('calm')">Calm</button>
+            <button onclick="playSong('sad')">Sad</button>
+            <button onclick="playSong('jazz')">Jazz</button>
+        </div>
+        <audio id="music" controls>
+            <source id="audio-source" src="" type="audio/mp3">
+            Your browser does not support the audio element.
+        </audio>
+        <div id="progress-bar" onclick="seekAudio(event)">
+            <div id="progress-bar-filled"></div>
+        </div>
+    </div>
+    <script>
+        let focusTime = 25
+        let breakTime = 5
+        let sessionsCount = 4
+        let currentTimer = null
+        let isFocusSession = true
+        let timerRunning = false
+        let timeLeft = focusTime * 60
+        let completedSessions = 0
+
+        const musicElement = document.getElementById("music")
+        const progressBar = document.getElementById("progress-bar")
+        const progressBarFilled = document.getElementById("progress-bar-filled")
+
+        const backgrounds = {
+            calm: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcDV4Zmxlbjhwb2dsMmlma2FxY3pheXNuZHMxaG5yaHo1aXg2YTJuaSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/WRRL1EKo9rNe12S4zh/giphy.gif',
+            sad: 'https://media4.giphy.com/media/XbJYBCi69nyVOffLIU/giphy.gif',
+            jazz: 'https://media.giphy.com/media/3ohzgSHpvk6b8M7f9e/giphy.gif'
+        }
+
+        const musicSources = {
+            calm: 'https://cloud-fsvane2f6-hack-club-bot.vercel.app/2relaxing_piano_music___rain_sounds_for_deep_sleep__stress_relief_and_anxiety__meditation__calming__eko9bgdq7wk_.mp3',
+            sad: 'https://cloud-fsvane2f6-hack-club-bot.vercel.app/0departure_lane_last_20_seconds__1_hour_loop___hbkbyixv3mw_.mp3',  
+            jazz: 'https://cloud-fsvane2f6-hack-club-bot.vercel.app/1old_radio_jazz_for_sleeping_-_peaceful_melodies_for_restful_nights__jazz__nostalgia.mp3'
+        }    
+
+        let isMusicPlaying = false
+
+        function playSong(theme) {
+            document.body.style.backgroundImage = `url('${backgrounds[theme]}')`
+            document.body.style.backgroundSize = "cover"
+            document.body.style.backgroundPosition = "center"
+            musicElement.src = musicSources[theme]
+            musicElement.play()
+            isMusicPlaying = true
+            musicElement.onplay = updateProgressBar
+            document.getElementById("progress-bar").style.display = 'block'
+            musicElement.controls = true
+        }
+
+        function updateProgressBar() {
+            musicElement.addEventListener('timeupdate', () => {
+                const progress = (musicElement.currentTime / musicElement.duration) * 100
+                progressBarFilled.style.width = `${progress}%`
+            })
+        }
+
+        function seekAudio(event) {
+            const percent = (event.offsetX / progressBar.offsetWidth)
+            musicElement.currentTime = percent * musicElement.duration
+        }
+
+        function startPomodoro() {
+            if (timerRunning) return
+            timerRunning = true
+            isFocusSession = true
+            document.getElementById("session-type").textContent = "Focus Time"
+            timeLeft = focusTime * 60
+            currentTimer = setInterval(updateTimer, 1000)
+            updateTimer()
+        }
+
+        function startBreak() {
+            if (timerRunning) return
+            isFocusSession = false
+            document.getElementById("session-type").textContent = "Break Time"
+            timeLeft = breakTime * 60
+            timerRunning = true
+            currentTimer = setInterval(updateTimer, 1000)
+            updateTimer()
+        }
+
+        function updateTimer() {
+            if (timeLeft <= 0) {
+                clearInterval(currentTimer)
+                timerRunning = false
+                if (isFocusSession) {
+                    completedSessions++
+                    if (completedSessions < sessionsCount) {
+                        alert("Focus session over! Starting break.")
+                        startBreak()
+                    } else {
+                        alert("All sessions completed! Time to rest.")
+                        resetPomodoro()
+                    }
+                } else {
+                    alert("Break session over! Starting next focus session.")
+                    isFocusSession = true
+                    startPomodoro()
+                }
+            } else {
+                const minutes = Math.floor(timeLeft / 60)
+                const seconds = timeLeft % 60
+                document.getElementById("timer").textContent = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`
+                timeLeft--
+            }
+        }
+
+        function resetPomodoro() {
+            clearInterval(currentTimer)
+            timerRunning = false
+            timeLeft = focusTime * 60
+            completedSessions = 0
+            document.getElementById("session-type").textContent = "Focus Time"
+            document.getElementById("timer").textContent = `${focusTime}:00`
+        }
+
+        function adjustFocusTime(amount) {
+            focusTime = Math.max(5, focusTime + amount)
+            document.getElementById("focus-time").textContent = focusTime
+            if (isFocusSession) {
+                timeLeft = focusTime * 60
+                document.getElementById("timer").textContent = `${focusTime}:00`
+            }
+        }
+
+        function adjustBreakTime(amount) {
+            breakTime = Math.max(1, breakTime + amount)
+            document.getElementById("break-time").textContent = breakTime
+        }
+
+        function adjustSessions(amount) {
+            sessionsCount = Math.max(1, sessionsCount + amount)
+            document.getElementById("sessions-count").textContent = sessionsCount
+        }
+    </script>
+</body>
+</html>
